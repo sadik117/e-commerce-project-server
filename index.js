@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -63,6 +63,38 @@ async function run() {
         res.json({ success: true, result });
       } catch (err) {
         console.error("Product insert failed:", err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    // Get all products
+    app.get("/products", async (req, res) => {
+      try {
+        const products = await productsCollection.find().toArray();
+        res.json({ success: true, products });
+      } catch (err) {
+        console.error("Failed to fetch products:", err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    // Get single product by ID
+    app.get("/products/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const product = await productsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!product) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
+        }
+
+        res.json({ success: true, product });
+      } catch (err) {
+        console.error("Failed to fetch product:", err);
         res.status(500).json({ success: false, message: err.message });
       }
     });
