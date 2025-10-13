@@ -29,6 +29,7 @@ async function run() {
     // DB + Collections
     const db = client.db("robeDB");
     const productsCollection = db.collection("products");
+    const ordersCollection = db.collection("orders");
 
     // Upload image to cloudinary
     app.post("/upload", async (req, res) => {
@@ -96,6 +97,49 @@ async function run() {
       } catch (err) {
         console.error("Failed to fetch product:", err);
         res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    // POST order
+    app.post("/orders", async (req, res) => {
+      try {
+        const order = req.body;
+
+        if (
+          !order ||
+          !order.customer ||
+          !order.items ||
+          order.items.length === 0
+        ) {
+          return res.status(400).json({ message: "Invalid order data" });
+        }
+
+        // Add a createdAt timestamp if not provided
+        if (!order.createdAt) order.createdAt = new Date();
+
+        const result = await ordersCollection.insertOne(order);
+
+        res.status(201).json({
+          message: "Order placed successfully",
+          orderId: result.insertedId,
+        });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+      }
+    });
+
+    // Get all orders
+    app.get("/orders", async (req, res) => {
+      try {
+        const orders = await ordersCollection
+          .find()
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.status(200).json(orders);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to fetch orders" });
       }
     });
 
