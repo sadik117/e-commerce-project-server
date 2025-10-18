@@ -30,6 +30,7 @@ async function run() {
     const db = client.db("robeDB");
     const productsCollection = db.collection("products");
     const ordersCollection = db.collection("orders");
+    const usersCollection = db.collection("users");
 
     // Upload image to cloudinary
     app.post("/upload", async (req, res) => {
@@ -140,6 +141,31 @@ async function run() {
       } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Failed to fetch orders" });
+      }
+    });
+
+    // POST users
+    app.post("/users", async (req, res) => {
+      try {
+        const { email, uid } = req.body;
+        if (!email || !uid)
+          return res
+            .status(400)
+            .json({ message: "Email and UID are required" });
+
+        const user = await usersCollection.findOne({ email });
+        if (user) {
+          await usersCollection.updateOne(
+            { email },
+            { $set: { lastLogin: new Date() } }
+          );
+          return res.status(200).json({ message: "User updated", user });
+        }
+
+        const result = await usersCollection.insertOne(req.body);
+        res.status(201).json({ message: "New user logged in", user: result });
+      } catch (err) {
+        res.status(500).json({ message: err.message });
       }
     });
 
