@@ -144,6 +144,70 @@ async function run() {
       }
     });
 
+    // Update product 
+    app.put("/products/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid product ID" });
+        }
+
+        const result = await productsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData }
+        );
+
+        if (result.matchedCount === 0) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
+        }
+
+        res.json({
+          success: true,
+          message: "Product updated successfully",
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (err) {
+        console.error("Failed to update product:", err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
+    // Delete product
+    app.delete("/products/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid product ID" });
+        }
+
+        const result = await productsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount === 0) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
+        }
+
+        res.json({ success: true, message: "Product deleted successfully" });
+      } catch (err) {
+        console.error("Failed to delete product:", err);
+        res.status(500).json({ success: false, message: err.message });
+      }
+    });
+
     // POST users
     app.post("/users", async (req, res) => {
       try {
