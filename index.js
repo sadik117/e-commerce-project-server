@@ -36,7 +36,9 @@ async function run() {
       try {
         const { image } = req.body;
         if (!image) {
-          return res.status(400).json({ success: false, message: "No image provided" });
+          return res
+            .status(400)
+            .json({ success: false, message: "No image provided" });
         }
 
         const uploadResponse = await cloudinary.uploader.upload(image, {
@@ -77,8 +79,13 @@ async function run() {
     app.get("/products/:id", async (req, res) => {
       try {
         const id = req.params.id;
-        const product = await productsCollection.findOne({ _id: new ObjectId(id) });
-        if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+        const product = await productsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        if (!product)
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
         res.json({ success: true, product });
       } catch (err) {
         console.error("Failed to fetch product:", err);
@@ -92,7 +99,9 @@ async function run() {
         const id = req.params.id;
         const updatedData = req.body;
         if (!ObjectId.isValid(id)) {
-          return res.status(400).json({ success: false, message: "Invalid product ID" });
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid product ID" });
         }
 
         const result = await productsCollection.updateOne(
@@ -101,7 +110,9 @@ async function run() {
         );
 
         if (result.matchedCount === 0)
-          return res.status(404).json({ success: false, message: "Product not found" });
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
 
         res.json({ success: true, message: "Product updated successfully" });
       } catch (err) {
@@ -115,12 +126,18 @@ async function run() {
       try {
         const id = req.params.id;
         if (!ObjectId.isValid(id)) {
-          return res.status(400).json({ success: false, message: "Invalid product ID" });
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid product ID" });
         }
 
-        const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+        const result = await productsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
         if (result.deletedCount === 0)
-          return res.status(404).json({ success: false, message: "Product not found" });
+          return res
+            .status(404)
+            .json({ success: false, message: "Product not found" });
 
         res.json({ success: true, message: "Product deleted successfully" });
       } catch (err) {
@@ -164,7 +181,10 @@ async function run() {
     //  Get all orders
     app.get("/orders", async (req, res) => {
       try {
-        const orders = await ordersCollection.find().sort({ createdAt: -1 }).toArray();
+        const orders = await ordersCollection
+          .find()
+          .sort({ createdAt: -1 })
+          .toArray();
         res.status(200).json(orders);
       } catch (err) {
         console.error(err);
@@ -178,12 +198,17 @@ async function run() {
         const { userEmail, code, discount } = req.body;
 
         if (!userEmail || !code || !discount) {
-          return res.status(400).json({ success: false, message: "All fields required" });
+          return res
+            .status(400)
+            .json({ success: false, message: "All fields required" });
         }
 
         const existing = await couponsCollection.findOne({ code });
         if (existing) {
-          return res.json({ success: false, message: "Coupon code already exists!" });
+          return res.json({
+            success: false,
+            message: "Coupon code already exists!",
+          });
         }
 
         const coupon = {
@@ -217,7 +242,7 @@ async function run() {
 
         return res.json({
           valid: true,
-          discountAmount: coupon.discount, 
+          discountAmount: coupon.discount,
         });
       } catch (error) {
         console.error("Verify coupon failed:", error);
@@ -235,16 +260,40 @@ async function run() {
       }
     });
 
+    // DELETE coupon
+    app.delete("/coupons/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await couponsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Coupon not found" });
+        }
+
+        res.status(200).json({ message: "Coupon deleted successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to delete coupon" });
+      }
+    });
+
     // POST /users
     app.post("/users", async (req, res) => {
       try {
         const { email, uid } = req.body;
         if (!email || !uid)
-          return res.status(400).json({ message: "Email and UID are required" });
+          return res
+            .status(400)
+            .json({ message: "Email and UID are required" });
 
         const user = await usersCollection.findOne({ email });
         if (user) {
-          await usersCollection.updateOne({ email }, { $set: { lastLogin: new Date() } });
+          await usersCollection.updateOne(
+            { email },
+            { $set: { lastLogin: new Date() } }
+          );
           return res.status(200).json({ message: "User updated", user });
         }
 
@@ -280,4 +329,3 @@ async function run() {
 }
 
 run();
- 
