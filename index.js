@@ -313,6 +313,21 @@ async function run() {
         res.status(500).json({ success: false, message: error.message });
       }
     });
+ 
+    // GET user by role
+    app.get("/users/role/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const user = await usersCollection.findOne({ email });
+        if (!user) {
+          return res.status(404).send({ role: null });
+        }
+        res.send({ role: user.role });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Server error" });
+      }
+    });
 
     //  Root
     app.get("/", (req, res) => {
