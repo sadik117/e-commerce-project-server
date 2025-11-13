@@ -1,8 +1,8 @@
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const cloudinary = require("./config/cloudinary");
+import express, { json } from "express";
+import cors from "cors";
+import { uploader } from "./config/cloudinary";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -29,7 +29,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(json({ limit: "10mb" }));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8tecw61.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -62,7 +62,7 @@ async function run() {
             .json({ success: false, message: "No image provided" });
         }
 
-        const uploadResponse = await cloudinary.uploader.upload(image, {
+        const uploadResponse = await uploader.upload(image, {
           folder: "robe_products",
         });
 
