@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 const allowedOrigins = [
   "http://localhost:5173",
   "https://robe-by-shamshad.vercel.app",
-  "https://www.robebyshamshad.com"
+  "https://www.robebyshamshad.com",
 ];
 
 app.use(
