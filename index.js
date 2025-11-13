@@ -7,7 +7,27 @@ const cloudinary = require("./config/cloudinary");
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://robe-by-shamshad.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like Postman or server-side)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json({ limit: "10mb" }));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8tecw61.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -250,17 +270,62 @@ async function run() {
       }
     });
 
-    // Get all coupons
+    // GET all coupons
     app.get("/coupons", async (req, res) => {
       try {
         const coupons = await couponsCollection.find().toArray();
-        res.json({ success: true, coupons });
+        res.status(200).json({ success: true, coupons });
       } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Error fetching coupons:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to fetch coupons" });
       }
     });
 
-    // DELETE coupon
+    // CREATE a new coupon
+    app.post("/coupons", async (req, res) => {
+      try {
+        const { code, discount, expiryDate, description } = req.body;
+
+        if (!code || !discount || !expiryDate) {
+          return res
+            .status(400)
+            .json({ success: false, message: "All fields are required" });
+        }
+
+        const existing = await couponsCollection.findOne({ code });
+        if (existing) {
+          return res
+            .status(409)
+            .json({ success: false, message: "Coupon code already exists" });
+        }
+
+        const newCoupon = {
+          code,
+          discount,
+          expiryDate,
+          description: description || "",
+          createdAt: new Date(),
+        };
+
+        await couponsCollection.insertOne(newCoupon);
+        res
+          .status(201)
+          .json({
+            success: true,
+            message: "Coupon created successfully",
+            coupon: newCoupon,
+          });
+      } catch (error) {
+        console.error("Error creating coupon:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to create coupon" });
+      }
+    });
+
+    //  DELETE a coupon by ID
     app.delete("/coupons/:id", async (req, res) => {
       try {
         const { id } = req.params;
@@ -269,13 +334,19 @@ async function run() {
         });
 
         if (result.deletedCount === 0) {
-          return res.status(404).json({ message: "Coupon not found" });
+          return res
+            .status(404)
+            .json({ success: false, message: "Coupon not found" });
         }
 
-        res.status(200).json({ message: "Coupon deleted successfully" });
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Failed to delete coupon" });
+        res
+          .status(200)
+          .json({ success: true, message: "Coupon deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting coupon:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to delete coupon" });
       }
     });
 
@@ -313,7 +384,7 @@ async function run() {
         res.status(500).json({ success: false, message: error.message });
       }
     });
- 
+
     // GET user by role
     app.get("/users/role/:email", async (req, res) => {
       try {
