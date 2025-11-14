@@ -51,7 +51,7 @@ async function run() {
     const ordersCollection = db.collection("orders");
     const usersCollection = db.collection("users");
     const couponsCollection = db.collection("coupons");
-    const slidesCollection = db.collection("slides"); 
+    const slidesCollection = db.collection("slides");
 
     // Upload image to Cloudinary
     app.post("/upload", async (req, res) => {
@@ -214,22 +214,59 @@ async function run() {
       }
     });
 
-    //  Create / Assign coupon
+    // CREATE / ASSIGN Coupon (supports single user OR all users)
     app.post("/coupons", async (req, res) => {
       try {
-        const { userEmail, code, discount } = req.body;
+        const { userEmail, code, discount, forAll } = req.body;
 
-        if (!userEmail || !code || !discount) {
-          return res
-            .status(400)
-            .json({ success: false, message: "All fields required" });
+        if (!code || !discount) {
+          return res.status(400).json({
+            success: false,
+            message: "Code and discount are required",
+          });
         }
 
-        const existing = await couponsCollection.findOne({ code });
-        if (existing) {
-          return res.json({
+        // Check if coupon code already exists globally
+        const exists = await couponsCollection.findOne({ code });
+        if (exists) {
+          return res.status(409).json({
             success: false,
-            message: "Coupon code already exists!",
+            message: "Coupon code already exists",
+          });
+        }
+
+        // If assigning to all users
+        if (forAll) {
+          const allUsers = await usersCollection.find().toArray();
+
+          if (allUsers.length === 0) {
+            return res.status(404).json({
+              success: false,
+              message: "No users found to assign coupon",
+            });
+          }
+
+          const bulkCoupons = allUsers.map((user) => ({
+            userEmail: user.email,
+            code,
+            discount,
+            createdAt: new Date(),
+            used: false,
+          }));
+
+          await couponsCollection.insertMany(bulkCoupons);
+
+          return res.status(201).json({
+            success: true,
+            message: "Coupon assigned to all users successfully",
+          });
+        }
+
+        // Assign to ONE USER
+        if (!userEmail) {
+          return res.status(400).json({
+            success: false,
+            message: "User email is required when not assigning to all",
           });
         }
 
@@ -241,10 +278,19 @@ async function run() {
           used: false,
         };
 
-        const result = await couponsCollection.insertOne(coupon);
-        res.json({ success: true, message: "Coupon assigned", result });
+        await couponsCollection.insertOne(coupon);
+
+        res.status(201).json({
+          success: true,
+          message: "Coupon assigned successfully",
+          coupon,
+        });
       } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Create coupon failed:", error);
+        res.status(500).json({
+          success: false,
+          message: "Server error",
+        });
       }
     });
 
@@ -400,119 +446,119 @@ async function run() {
       }
     });
 
-   /**
- * GET /slides
- * Returns all slides
- */
-app.get("/slides", async (req, res) => {
-  try {
-    const slides = await slidesCollection.find({}).toArray();
-    res.json(slides);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch slides" });
-  }
-});
-
-/**
- * GET /slides/:id
- */
-app.get("/slides/:id", async (req, res) => {
-  try {
-    const slide = await slidesCollection.findOne({
-      _id: new ObjectId(req.params.id),
+    /**
+     * GET /slides
+     * Returns all slides
+     */
+    app.get("/slides", async (req, res) => {
+      try {
+        const slides = await slidesCollection.find({}).toArray();
+        res.json(slides);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch slides" });
+      }
     });
 
-    if (!slide) return res.status(404).json({ error: "Slide not found" });
+    /**
+     * GET /slides/:id
+     */
+    app.get("/slides/:id", async (req, res) => {
+      try {
+        const slide = await slidesCollection.findOne({
+          _id: new ObjectId(req.params.id),
+        });
 
-    res.json(slide);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Invalid ID or server error" });
-  }
-});
+        if (!slide) return res.status(404).json({ error: "Slide not found" });
 
-/**
- * POST /slides
- * Body: { image, title, subtitle }
- */
-app.post("/slides", async (req, res) => {
-  const { image, title, subtitle } = req.body;
-
-  if (!image) {
-    return res.status(400).json({ error: "Image is required" });
-  }
-
-  try {
-    const result = await slidesCollection.insertOne({
-      image,
-      title,
-      subtitle,
-      createdAt: new Date(),
+        res.json(slide);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Invalid ID or server error" });
+      }
     });
 
-    const newSlide = {
-      _id: result.insertedId,
-      image,
-      title,
-      subtitle,
-    };
+    /**
+     * POST /slides
+     * Body: { image, title, subtitle }
+     */
+    app.post("/slides", async (req, res) => {
+      const { image, title, subtitle } = req.body;
 
-    res.status(201).json(newSlide);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create slide" });
-  }
-});
+      if (!image) {
+        return res.status(400).json({ error: "Image is required" });
+      }
 
-/**
- * PUT /slides/:id
- * Body: { image?, title?, subtitle? }
- */
-app.put("/slides/:id", async (req, res) => {
-  const updates = req.body;
+      try {
+        const result = await slidesCollection.insertOne({
+          image,
+          title,
+          subtitle,
+          createdAt: new Date(),
+        });
 
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: "Nothing to update" });
-  }
+        const newSlide = {
+          _id: result.insertedId,
+          image,
+          title,
+          subtitle,
+        };
 
-  try {
-    const result = await slidesCollection.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: updates },
-      { returnDocument: "after" }
-    );
-
-    if (!result.value) {
-      return res.status(404).json({ error: "Slide not found" });
-    }
-
-    res.json(result.value);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Invalid ID or failed to update slide" });
-  }
-});
-
-/**
- * DELETE /slides/:id
- */
-app.delete("/slides/:id", async (req, res) => {
-  try {
-    const result = await slidesCollection.findOneAndDelete({
-      _id: new ObjectId(req.params.id),
+        res.status(201).json(newSlide);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to create slide" });
+      }
     });
 
-    if (!result.value) {
-      return res.status(404).json({ error: "Slide not found" });
-    }
+    /**
+     * PUT /slides/:id
+     * Body: { image?, title?, subtitle? }
+     */
+    app.put("/slides/:id", async (req, res) => {
+      const updates = req.body;
 
-    res.json({ message: "Slide deleted" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Invalid ID or failed to delete slide" });
-  }
-});
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "Nothing to update" });
+      }
+
+      try {
+        const result = await slidesCollection.findOneAndUpdate(
+          { _id: new ObjectId(req.params.id) },
+          { $set: updates },
+          { returnDocument: "after" }
+        );
+
+        if (!result.value) {
+          return res.status(404).json({ error: "Slide not found" });
+        }
+
+        res.json(result.value);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Invalid ID or failed to update slide" });
+      }
+    });
+
+    /**
+     * DELETE /slides/:id
+     */
+    app.delete("/slides/:id", async (req, res) => {
+      try {
+        const result = await slidesCollection.findOneAndDelete({
+          _id: new ObjectId(req.params.id),
+        });
+
+        if (!result.value) {
+          return res.status(404).json({ error: "Slide not found" });
+        }
+
+        res.json({ message: "Slide deleted" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Invalid ID or failed to delete slide" });
+      }
+    });
 
     //  Root
     app.get("/", (req, res) => {
