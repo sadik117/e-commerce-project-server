@@ -400,107 +400,119 @@ async function run() {
       }
     });
 
-    /**
-     * GET /api/slides
-     * Returns all slides sorted by `id`
-     */
-    app.get("/slides", async (req, res) => {
-      try {
-        const slides = await slidesCollection
-          .find({})
-          .sort({ id: 1 })
-          .toArray();
-        res.json(slides);
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to fetch slides" });
-      }
+   /**
+ * GET /slides
+ * Returns all slides
+ */
+app.get("/slides", async (req, res) => {
+  try {
+    const slides = await slidesCollection.find({}).toArray();
+    res.json(slides);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch slides" });
+  }
+});
+
+/**
+ * GET /slides/:id
+ */
+app.get("/slides/:id", async (req, res) => {
+  try {
+    const slide = await slidesCollection.findOne({
+      _id: new ObjectId(req.params.id),
     });
 
-    /**
-     * GET /api/slides/:id
-     */
-    app.get("/slides/:id", async (req, res) => {
-      try {
-        const slide = await slidesCollection.findOne({
-          id: Number(req.params.id),
-        });
-        if (!slide) return res.status(404).json({ error: "Slide not found" });
-        res.json(slide);
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Server error" });
-      }
+    if (!slide) return res.status(404).json({ error: "Slide not found" });
+
+    res.json(slide);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Invalid ID or server error" });
+  }
+});
+
+/**
+ * POST /slides
+ * Body: { image, title, subtitle }
+ */
+app.post("/slides", async (req, res) => {
+  const { image, title, subtitle } = req.body;
+
+  if (!image) {
+    return res.status(400).json({ error: "Image is required" });
+  }
+
+  try {
+    const result = await slidesCollection.insertOne({
+      image,
+      title,
+      subtitle,
+      createdAt: new Date(),
     });
 
-    /**
-     * POST /api/slides
-     * Body: { id, image, title, subtitle }
-     */
-    app.post("/slides", async (req, res) => {
-      const { image, title, subtitle } = req.body;
-      if (!id || !image || !title || !subtitle) {
-        return res.status(400).json({ error: "All fields are required" });
-      }
+    const newSlide = {
+      _id: result.insertedId,
+      image,
+      title,
+      subtitle,
+    };
 
-      try {
-        const exists = await slidesCollection.findOne({ id });
-        if (exists) return res.status(409).json({ error: "ID already exists" });
+    res.status(201).json(newSlide);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create slide" });
+  }
+});
 
-        const result = await slidesCollection.insertOne({
-          image,
-          title,
-          subtitle,
-        });
-        const newSlide = { _id: result.insertedId, id, image, title, subtitle };
-        res.status(201).json(newSlide);
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to create slide" });
-      }
+/**
+ * PUT /slides/:id
+ * Body: { image?, title?, subtitle? }
+ */
+app.put("/slides/:id", async (req, res) => {
+  const updates = req.body;
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "Nothing to update" });
+  }
+
+  try {
+    const result = await slidesCollection.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updates },
+      { returnDocument: "after" }
+    );
+
+    if (!result.value) {
+      return res.status(404).json({ error: "Slide not found" });
+    }
+
+    res.json(result.value);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Invalid ID or failed to update slide" });
+  }
+});
+
+/**
+ * DELETE /slides/:id
+ */
+app.delete("/slides/:id", async (req, res) => {
+  try {
+    const result = await slidesCollection.findOneAndDelete({
+      _id: new ObjectId(req.params.id),
     });
 
-    /**
-     * PUT /api/slides/:id
-     * Body: { image?, title?, subtitle? }
-     */
-    app.put("/slides/:id", async (req, res) => {
-      const updates = req.body;
-      if (Object.keys(updates).length === 0) {
-        return res.status(400).json({ error: "Nothing to update" });
-      }
+    if (!result.value) {
+      return res.status(404).json({ error: "Slide not found" });
+    }
 
-      try {
-        const result = await slidesCollection.findOneAndUpdate(
-          { id: Number(req.params.id) },
-          { $set: updates },
-          { returnDocument: "after" }
-        );
-        if (!result.value)
-          return res.status(404).json({ error: "Slide not found" });
-        res.json(result.value);
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to update slide" });
-      }
-    });
-
-    /**
-     * DELETE /api/slides/:id
-     */
-    app.delete("/slides/:id", async (req, res) => {
-      try {
-        const result = await slidesCollection.findOneAndDelete({
-          id: Number(req.params.id),
-        });
-        if (!result.value)
-          return res.status(404).json({ error: "Slide not found" });
-        res.json({ message: "Slide deleted" });
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to delete slide" });
-      }
-    });
+    res.json({ message: "Slide deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Invalid ID or failed to delete slide" });
+  }
+});
 
     //  Root
     app.get("/", (req, res) => {
