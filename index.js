@@ -51,6 +51,7 @@ async function run() {
     const ordersCollection = db.collection("orders");
     const usersCollection = db.collection("users");
     const couponsCollection = db.collection("coupons");
+    const slidesCollection = db.collection("slides"); 
 
     // Upload image to Cloudinary
     app.post("/upload", async (req, res) => {
@@ -311,13 +312,11 @@ async function run() {
         };
 
         await couponsCollection.insertOne(newCoupon);
-        res
-          .status(201)
-          .json({
-            success: true,
-            message: "Coupon created successfully",
-            coupon: newCoupon,
-          });
+        res.status(201).json({
+          success: true,
+          message: "Coupon created successfully",
+          coupon: newCoupon,
+        });
       } catch (error) {
         console.error("Error creating coupon:", error);
         res
@@ -398,6 +397,108 @@ async function run() {
       } catch (err) {
         console.error(err);
         res.status(500).send({ message: "Server error" });
+      }
+    });
+
+    /**
+     * GET /api/slides
+     * Returns all slides sorted by `id`
+     */
+    app.get("/slides", async (req, res) => {
+      try {
+        const slides = await slidesCollection
+          .find({})
+          .sort({ id: 1 })
+          .toArray();
+        res.json(slides);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to fetch slides" });
+      }
+    });
+
+    /**
+     * GET /api/slides/:id
+     */
+    app.get("/slides/:id", async (req, res) => {
+      try {
+        const slide = await slidesCollection.findOne({
+          id: Number(req.params.id),
+        });
+        if (!slide) return res.status(404).json({ error: "Slide not found" });
+        res.json(slide);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+      }
+    });
+
+    /**
+     * POST /api/slides
+     * Body: { id, image, title, subtitle }
+     */
+    app.post("/slides", async (req, res) => {
+      const { image, title, subtitle } = req.body;
+      if (!id || !image || !title || !subtitle) {
+        return res.status(400).json({ error: "All fields are required" });
+      }
+
+      try {
+        const exists = await slidesCollection.findOne({ id });
+        if (exists) return res.status(409).json({ error: "ID already exists" });
+
+        const result = await slidesCollection.insertOne({
+          image,
+          title,
+          subtitle,
+        });
+        const newSlide = { _id: result.insertedId, id, image, title, subtitle };
+        res.status(201).json(newSlide);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to create slide" });
+      }
+    });
+
+    /**
+     * PUT /api/slides/:id
+     * Body: { image?, title?, subtitle? }
+     */
+    app.put("/slides/:id", async (req, res) => {
+      const updates = req.body;
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "Nothing to update" });
+      }
+
+      try {
+        const result = await slidesCollection.findOneAndUpdate(
+          { id: Number(req.params.id) },
+          { $set: updates },
+          { returnDocument: "after" }
+        );
+        if (!result.value)
+          return res.status(404).json({ error: "Slide not found" });
+        res.json(result.value);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to update slide" });
+      }
+    });
+
+    /**
+     * DELETE /api/slides/:id
+     */
+    app.delete("/slides/:id", async (req, res) => {
+      try {
+        const result = await slidesCollection.findOneAndDelete({
+          id: Number(req.params.id),
+        });
+        if (!result.value)
+          return res.status(404).json({ error: "Slide not found" });
+        res.json({ message: "Slide deleted" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to delete slide" });
       }
     });
 
